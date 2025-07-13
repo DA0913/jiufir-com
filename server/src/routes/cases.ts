@@ -34,8 +34,8 @@ router.get('/industries', async (_req: Request, res: Response) => {
 });
 
 // 获取详情
-router.get('/:id', async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
+  const id = String(req.params.id);
   const result = await CustomerCaseService.getCustomerCaseById(id);
   result.success
     ? res.json({ success: true, data: result.data })
@@ -67,8 +67,8 @@ router.post(
 );
 
 // 更新
-router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.put('/:id', authMiddleware, async (req: Request<{ id: string }>, res: Response) => {
+  const id = String(req.params.id);
   const result = await CustomerCaseService.updateCustomerCase(id, req.body);
   result.success
     ? res.json({ success: true, data: result.data })
@@ -76,8 +76,8 @@ router.put('/:id', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // 删除
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
-  const { id } = req.params;
+router.delete('/:id', authMiddleware, async (req: Request<{ id: string }>, res: Response) => {
+  const id = String(req.params.id);
   const result = await CustomerCaseService.deleteCustomerCase(id);
   result.success
     ? res.json({ success: true })

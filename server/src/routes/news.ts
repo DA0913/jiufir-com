@@ -79,9 +79,9 @@ router.get('/featured', async (req: Request, res: Response) => {
 });
 
 // 根据ID获取新闻文章
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const result = await NewsService.getNewsArticleById(id);
 
     if (result.success) {
@@ -108,9 +108,9 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // 根据分类获取新闻文章
-router.get('/category/:category', async (req: Request, res: Response) => {
+router.get('/category/:category', async (req: Request<{ category: string }>, res: Response) => {
   try {
-    const { category } = req.params;
+    const category = String(req.params.category);
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
@@ -189,7 +189,7 @@ router.post('/', authMiddleware, validateNewsArticle, async (req: Request, res: 
 });
 
 // 更新新闻文章（管理员接口）
-router.patch('/:id', authMiddleware, validateNewsArticle, async (req: Request, res: Response) => {
+router.patch('/:id', authMiddleware, validateNewsArticle, async (req: Request<{ id: string }>, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -200,7 +200,7 @@ router.patch('/:id', authMiddleware, validateNewsArticle, async (req: Request, r
       });
     }
 
-    const { id } = req.params;
+    const id = String(req.params.id);
     const updateData: Partial<CreateNewsArticleRequest> = req.body;
 
     const result = await NewsService.updateNewsArticle(id, updateData);
@@ -227,9 +227,9 @@ router.patch('/:id', authMiddleware, validateNewsArticle, async (req: Request, r
 });
 
 // 删除新闻文章（管理员接口）
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: Request<{ id: string }>, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const result = await NewsService.deleteNewsArticle(id);
 
     if (result.success) {

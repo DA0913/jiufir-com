@@ -95,9 +95,9 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
 });
 
 // 根据ID获取表单提交
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request<{ id: string }>, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const result = await FormService.getFormSubmissionById(id);
 
     if (result.success) {
@@ -135,7 +135,7 @@ router.patch('/:id', authMiddleware, [
       });
     }
 
-    const { id } = req.params;
+    const id = String(req.params.id);
     const updateData: UpdateFormSubmissionRequest = req.body;
 
     const result = await FormService.updateFormSubmission(id, updateData);
@@ -162,9 +162,9 @@ router.patch('/:id', authMiddleware, [
 });
 
 // 删除表单提交（管理员接口）
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: Request<{ id: string }>, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const result = await FormService.deleteFormSubmission(id);
 
     if (result.success) {
