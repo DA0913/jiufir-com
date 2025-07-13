@@ -1,63 +1,88 @@
-import { Pool, PoolConfig } from 'pg';
-import dotenv from 'dotenv';
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
 
-dotenv.config();
+/*
+ * 该文件原本使用 pg 连接 PostgreSQL。
+ * 为了消除外部依赖，改用 SQLite（better-sqlite3 同步驱动）。
+ * 对外仍暴露 query() 与 testConnection()，保持其他 Service 不变。
+ */
 
-const dbConfig: PoolConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'erp_database',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'your_password',
-  max: 20, // 连接池最大连接数
-  idleTimeoutMillis: 30000, // 连接空闲超时时间
-  connectionTimeoutMillis: 2000, // 连接超时时间
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-};
+const dbPath = path.resolve(process.cwd(), 'erp.sqlite');
+const isFirstRun = !fs.existsSync(dbPath);
 
-// 创建连接池
-const pool = new Pool(dbConfig);
+const db = new Database(dbPath);
 
-// 测试数据库连接
-pool.on('connect', () => {
-  console.log('✅ 数据库连接成功');
-});
+// 将形如 $1、$2 的占位符替换成 SQLite 的 ? 占位符
+function convertPlaceholders(sql: string) {
+  return sql.replace(/\$\d+/g, '?');
+}
 
-pool.on('error', (err) => {
-  console.error('❌ 数据库连接错误:', err);
-});
+export async function query(text: string, params: any[] = []) {
+  const sql = convertPlaceholders(text);
+  const stmt = db.prepare(sql);
+  const isSelect = /^\s*select/i.test(sql);
 
-// 数据库连接测试函数
-export const testConnection = async (): Promise<boolean> => {
+  if (isSelect) {
+    const rows = stmt.all(...params);
+    return { rows, rowCount: rows.length };
+  }
+  const info = stmt.run(...params);
+  // better-sqlite3 对 INSERT/UPDATE 返回 .changes
+  return { rows: [], rowCount: info.changes };
+}
+
+export async function testConnection() {
   try {
-    const client = await pool.connect();
-    const result = await client.query('SELECT NOW()');
-    client.release();
-    console.log('✅ 数据库连接测试成功:', result.rows[0]);
+    db.prepare('SELECT 1').get();
     return true;
-  } catch (error) {
-    console.error('❌ 数据库连接测试失败:', error);
+  } catch (e) {
+    console.error('SQLite 连接测试失败:', e);
     return false;
   }
-};
+}
 
-// 执行查询的通用函数
-export const query = async (text: string, params?: any[]): Promise<any> => {
-  const start = Date.now();
-  try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log('📊 执行查询:', { text, duration, rows: res.rowCount });
-    return res;
-  } catch (error) {
-    console.error('❌ 查询执行失败:', error);
-    throw error;
-  }
-};
+// 初始化表结构（仅首次生成数据库文件时）
+if (isFirstRun) {
+  const schema = `
+  PRAGMA foreign_keys = ON;
 
-// 获取客户端（用于事务）
-export const getClient = async () => {
-  return await pool.connect();
-};
+  CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    email TEXT,
+    password_hash TEXT,
+    role TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 
-export default pool; 
+  CREATE TABLE form_submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_name TEXT,
+    user_name TEXT,
+    phone TEXT,
+    company_types TEXT,
+    source_url TEXT,
+    status TEXT DEFAULT 'pending',
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE news_articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    summary TEXT,
+    content TEXT,
+    author TEXT,
+    cover_image TEXT,
+    is_top INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'draft',
+    published_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );`;
+  db.exec(schema);
+  console.log('✅ 已初始化 SQLite 数据库表结构 ->', dbPath);
+} 
