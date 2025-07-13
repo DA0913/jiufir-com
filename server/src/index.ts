@@ -94,14 +94,14 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 });
 
 // 启动服务器
-const startServer = async () => {
+const startServer = () => {
   try {
     // 测试数据库连接
-    console.log('🔌 测试数据库连接...');
-    const isConnected = await testConnection();
+    console.log('🔌 测试 SQLite 数据库连接...');
+    const isConnected = testConnection();
     
     if (!isConnected) {
-      console.error('❌ 数据库连接失败，请检查配置');
+      console.error('❌ SQLite 数据库连接失败，请检查配置');
       process.exit(1);
     }
 
@@ -111,6 +111,7 @@ const startServer = async () => {
       console.log(`📍 服务地址: http://localhost:${PORT}`);
       console.log(`🔗 API文档: http://localhost:${PORT}/health`);
       console.log(`📊 环境: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`📁 数据库: SQLite (./data/app.db)`);
     });
 
   } catch (error) {

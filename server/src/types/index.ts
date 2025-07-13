@@ -93,6 +93,16 @@ export interface CreateNewsArticleRequest {
   is_featured?: boolean;
 }
 
+export interface UpdateNewsArticleRequest {
+  title?: string;
+  category?: string;
+  publish_time?: string;
+  image_url?: string;
+  summary?: string;
+  content?: string;
+  is_featured?: boolean;
+}
+
 export interface CreateCustomerCaseRequest {
   company_name: string;
   company_logo: string;

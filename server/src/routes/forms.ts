@@ -15,7 +15,7 @@ const validateFormSubmission = [
 ];
 
 // 提交表单
-router.post('/submit', validateFormSubmission, async (req: Request, res: Response) => {
+router.post('/submit', validateFormSubmission, (req: Request, res: Response) => {
   try {
     // 检查验证错误
     const errors = validationResult(req);
@@ -35,7 +35,7 @@ router.post('/submit', validateFormSubmission, async (req: Request, res: Respons
       source_url: req.body.source_url
     };
 
-    const result = await FormService.createFormSubmission(formData);
+    const result = FormService.createFormSubmission(formData);
 
     if (result.success) {
       res.status(201).json({
@@ -51,25 +51,27 @@ router.post('/submit', validateFormSubmission, async (req: Request, res: Respons
       });
     }
   } catch (error) {
-    console.error('表单提交处理错误:', error);
+    console.error('表单提交错误:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      error: error instanceof Error ? error.message : '未知错误'
     });
   }
 });
 
-// 获取所有表单提交（管理员接口）
-router.get('/', async (req: Request, res: Response) => {
+// 获取表单列表
+router.get('/', (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
-    const result = await FormService.getAllFormSubmissions(page, limit);
+    const result = FormService.getAllFormSubmissions(page, limit);
 
     if (result.success) {
       res.json({
         success: true,
+        message: '获取表单列表成功',
         data: result.data,
         pagination: {
           page,
@@ -80,134 +82,159 @@ router.get('/', async (req: Request, res: Response) => {
     } else {
       res.status(500).json({
         success: false,
-        message: '获取表单提交失败',
+        message: '获取表单列表失败',
         error: result.error
       });
     }
   } catch (error) {
-    console.error('获取表单提交错误:', error);
+    console.error('获取表单列表错误:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      error: error instanceof Error ? error.message : '未知错误'
     });
   }
 });
 
-// 根据ID获取表单提交
-router.get('/:id', async (req: Request, res: Response) => {
+// 获取单个表单
+router.get('/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await FormService.getFormSubmissionById(id);
-
-    if (result.success) {
-      res.json({
-        success: true,
-        data: result.data
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: result.error
-      });
-    }
-  } catch (error) {
-    console.error('获取表单提交错误:', error);
-    res.status(500).json({
-      success: false,
-      message: '服务器内部错误'
-    });
-  }
-});
-
-// 更新表单提交状态（管理员接口）
-router.patch('/:id', [
-  body('status').optional().isIn(['pending', 'processing', 'completed', 'invalid']).withMessage('状态值无效'),
-  body('notes').optional().isString().withMessage('备注必须是字符串')
-], async (req: Request, res: Response) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+    
+    if (!id) {
       return res.status(400).json({
         success: false,
-        message: '数据验证失败',
-        errors: errors.array()
+        message: '缺少表单ID参数'
       });
     }
-
-    const { id } = req.params;
-    const updateData: UpdateFormSubmissionRequest = req.body;
-
-    const result = await FormService.updateFormSubmission(id, updateData);
+    
+    const result = FormService.getFormSubmissionById(id);
 
     if (result.success) {
       res.json({
         success: true,
-        message: '更新成功',
+        message: '获取表单详情成功',
         data: result.data
       });
     } else {
       res.status(404).json({
         success: false,
-        message: result.error
+        message: '表单不存在',
+        error: result.error
       });
     }
   } catch (error) {
-    console.error('更新表单提交错误:', error);
+    console.error('获取表单详情错误:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      error: error instanceof Error ? error.message : '未知错误'
     });
   }
 });
 
-// 删除表单提交（管理员接口）
-router.delete('/:id', async (req: Request, res: Response) => {
+// 更新表单状态
+router.patch('/:id', (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const result = await FormService.deleteFormSubmission(id);
+    
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少表单ID参数'
+      });
+    }
+    
+    const updateData: UpdateFormSubmissionRequest = {
+      status: req.body.status,
+      notes: req.body.notes
+    };
+
+    const result = FormService.updateFormSubmission(id, updateData);
 
     if (result.success) {
       res.json({
         success: true,
-        message: '删除成功'
+        message: '更新表单状态成功',
+        data: result.data
       });
     } else {
       res.status(404).json({
         success: false,
-        message: result.error
+        message: '更新表单状态失败',
+        error: result.error
       });
     }
   } catch (error) {
-    console.error('删除表单提交错误:', error);
+    console.error('更新表单状态错误:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      error: error instanceof Error ? error.message : '未知错误'
     });
   }
 });
 
-// 获取表单提交统计（管理员接口）
-router.get('/stats/summary', async (req: Request, res: Response) => {
+// 删除表单
+router.delete('/:id', (req: Request, res: Response) => {
   try {
-    const result = await FormService.getFormSubmissionStats();
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少表单ID参数'
+      });
+    }
+    
+    const result = FormService.deleteFormSubmission(id);
 
     if (result.success) {
       res.json({
         success: true,
+        message: '删除表单成功'
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: '删除表单失败',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('删除表单错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '服务器内部错误',
+      error: error instanceof Error ? error.message : '未知错误'
+    });
+  }
+});
+
+// 获取表单统计
+router.get('/stats/overview', (req: Request, res: Response) => {
+  try {
+    const result = FormService.getFormSubmissionStats();
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: '获取统计信息成功',
         data: result.data
       });
     } else {
       res.status(500).json({
         success: false,
-        message: '获取统计失败',
+        message: '获取统计信息失败',
         error: result.error
       });
     }
   } catch (error) {
-    console.error('获取表单统计错误:', error);
+    console.error('获取统计信息错误:', error);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      error: error instanceof Error ? error.message : '未知错误'
     });
   }
 });
