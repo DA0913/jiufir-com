@@ -6,10 +6,8 @@ const dbPath = path.resolve(process.cwd(), 'erp.sqlite');
 const isFirstRun = !fs.existsSync(dbPath);
 const db = new Database(dbPath);
 
-// 把 $1、$2 占位符改成 ?
-function convert(sql: string) {
-  return sql.replace(/\$\d+/g, '?');
-}
+// 把 $1、$2 → ? 占位符
+const convert = (sql: string) => sql.replace(/\$\d+/g, '?');
 
 export async function query(text: string, params: any[] = []) {
   const sql = convert(text);
@@ -31,7 +29,7 @@ export async function testConnection() {
   }
 }
 
-// 首次启动建表
+// 首次启动自动建表 + 示例数据
 if (isFirstRun) {
   db.exec(`
     PRAGMA foreign_keys = ON;
