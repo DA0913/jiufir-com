@@ -2,16 +2,21 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
+// 数据库文件路径
 const dbPath = path.resolve(process.cwd(), 'erp.sqlite');
-const isFirstRun = !fs.existsSync(dbPath);
+const firstRun = !fs.existsSync(dbPath);
 const db = new Database(dbPath);
 
-// 把 $1、$2 → ? 占位符
-const convert = (sql: string) => sql.replace(/\$\d+/g, '?');
+// 将 $1、$2… 占位符替换为 SQLite 的 ?
+const conv = (sql: string) => sql.replace(/\$\d+/g, '?');
 
-export async function query(text: string, params: any[] = []) {
-  const sql = convert(text);
-  const stmt = db.prepare(sql);
+export interface QueryResult {
+  rows: any[];
+  rowCount: number;
+}
+
+export async function query(sql: string, params: any[] = []): Promise<QueryResult> {
+  const stmt = db.prepare(conv(sql));
   if (/^\s*select/i.test(sql)) {
     const rows = stmt.all(...params);
     return { rows, rowCount: rows.length };
@@ -29,8 +34,8 @@ export async function testConnection() {
   }
 }
 
-// 首次启动自动建表 + 示例数据
-if (isFirstRun) {
+// 首次运行自动建表 + 插入示例数据
+if (firstRun) {
   db.exec(`
     PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS users (
@@ -65,5 +70,5 @@ if (isFirstRun) {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
-  console.log('✅ 已初始化 SQLite 数据库表结构 ->', dbPath);
+  console.log('✅ SQLite 已初始化 →', dbPath);
 }
