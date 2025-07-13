@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { testConnection } from './config/database.js';
+import { initDatabase } from './database/init.js';
 
 // 路由导入
 import formsRouter from './routes/forms.js';
@@ -96,14 +96,9 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 // 启动服务器
 const startServer = async () => {
   try {
-    // 测试数据库连接
-    console.log('🔌 测试数据库连接...');
-    const isConnected = await testConnection();
-    
-    if (!isConnected) {
-      console.error('❌ 数据库连接失败，请检查配置');
-      process.exit(1);
-    }
+    // 初始化 SQLite 数据库（如果首次启动会自动建表）
+    console.log('�️  初始化 SQLite 数据库...');
+    initDatabase();
 
     // 启动HTTP服务器
     app.listen(PORT, () => {
