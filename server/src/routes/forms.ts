@@ -15,7 +15,7 @@ const validateFormSubmission = [
 ];
 
 // 提交表单
-router.post('/submit', validateFormSubmission, async (req: Request, res: Response) => {
+router.post('/submit', validateFormSubmission, async (req: Request, res: Response): Promise<void> => {
   try {
     // 检查验证错误
     const errors = validationResult(req);
@@ -94,10 +94,10 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // 根据ID获取表单提交
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await FormService.getFormSubmissionById(id);
+    const result = await FormService.getFormSubmissionById(id as string);
 
     if (result.success) {
       res.json({
@@ -120,10 +120,10 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // 更新表单提交状态（管理员接口）
-router.patch('/:id', [
+router.patch('/:id/status', [
   body('status').optional().isIn(['pending', 'processing', 'completed', 'invalid']).withMessage('状态值无效'),
   body('notes').optional().isString().withMessage('备注必须是字符串')
-], async (req: Request, res: Response) => {
+], async (req: Request, res: Response): Promise<void> => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -135,9 +135,9 @@ router.patch('/:id', [
     }
 
     const { id } = req.params;
-    const updateData: UpdateFormSubmissionRequest = req.body;
+    const updateData: UpdateFormSubmissionRequest = { status: req.body.status };
 
-    const result = await FormService.updateFormSubmission(id, updateData);
+    const result = await FormService.updateFormSubmission(id as string, updateData);
 
     if (result.success) {
       res.json({
@@ -161,10 +161,10 @@ router.patch('/:id', [
 });
 
 // 删除表单提交（管理员接口）
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const result = await FormService.deleteFormSubmission(id);
+    const result = await FormService.deleteFormSubmission(id as string);
 
     if (result.success) {
       res.json({
