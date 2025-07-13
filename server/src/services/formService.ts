@@ -10,13 +10,16 @@ export class FormService {
       const result = await query(
         `INSERT INTO form_submissions (company_name, user_name, phone, company_types, source_url)
          VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
+      `,
         [company_name, user_name, phone, JSON.stringify(company_types), source_url]
       );
 
+      // SQLite 获取最后插入行
+      const lastRow = await query('SELECT * FROM form_submissions ORDER BY id DESC LIMIT 1');
+
       return {
         success: true,
-        data: result.rows[0] as FormSubmission
+        data: lastRow.rows[0] as FormSubmission
       };
     } catch (error) {
       console.error('创建表单提交失败:', error);
@@ -109,20 +112,15 @@ export class FormService {
         `UPDATE form_submissions 
          SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
          WHERE id = $1
-         RETURNING *`,
+      `,
         values
       );
 
-      if (result.rows.length === 0) {
-        return {
-          success: false,
-          error: '表单提交不存在'
-        };
-      }
+      const updatedRow = await query('SELECT * FROM form_submissions WHERE id = $1', [id]);
 
       return {
         success: true,
-        data: result.rows[0] as FormSubmission
+        data: updatedRow.rows[0] as FormSubmission
       };
     } catch (error) {
       console.error('更新表单提交失败:', error);

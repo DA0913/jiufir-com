@@ -10,13 +10,15 @@ export class NewsService {
       const result = await query(
         `INSERT INTO news_articles (title, category, publish_time, image_url, summary, content, is_featured)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
+         `,
         [title, category, publish_time, image_url, summary, content, is_featured || false]
       );
 
+      const lastRow = await query('SELECT * FROM news_articles ORDER BY id DESC LIMIT 1');
+
       return {
         success: true,
-        data: result.rows[0] as NewsArticle
+        data: lastRow.rows[0] as NewsArticle
       };
     } catch (error) {
       console.error('创建新闻文章失败:', error);
@@ -176,20 +178,15 @@ export class NewsService {
         `UPDATE news_articles 
          SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
          WHERE id = $1
-         RETURNING *`,
+         `,
         values
       );
 
-      if (result.rows.length === 0) {
-        return {
-          success: false,
-          error: '新闻文章不存在'
-        };
-      }
+      const updRow = await query('SELECT * FROM news_articles WHERE id = $1', [id]);
 
       return {
         success: true,
-        data: result.rows[0] as NewsArticle
+        data: updRow.rows[0] as NewsArticle
       };
     } catch (error) {
       console.error('更新新闻文章失败:', error);
