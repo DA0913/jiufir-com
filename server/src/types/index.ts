@@ -131,7 +131,8 @@ export interface PaginatedResult<T> {
 }
 
 // 中间件类型
-export interface AuthenticatedRequest extends Request {
+import type { Request as ExpressRequest } from 'express';
+export interface AuthenticatedRequest extends ExpressRequest {
   user?: Omit<User, 'password_hash'>;
 }
 

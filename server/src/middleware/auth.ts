@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '../types/index.js';
 
 export const authMiddleware = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const authHeader = (req.headers['authorization'] as string | undefined) || '';
+    const authHeader = req.get('Authorization') || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : null;
 
     if (!token) {
