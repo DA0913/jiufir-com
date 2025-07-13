@@ -58,12 +58,32 @@ export class CustomerCaseService {
   }
 
   // 获取所有客户案例
-  static async getAllCustomerCases(page = 1, limit = 10): Promise<DatabaseResult<CustomerCase[]>> {
+  static async getAllCustomerCases(page = 1, limit = 10, filters: any = {}): Promise<DatabaseResult<CustomerCase[]>> {
     try {
       const offset = (page - 1) * limit;
+      const whereClauses: string[] = [];
+      const params: any[] = [];
+
+      if (filters.industry) {
+        whereClauses.push('industry = ?');
+        params.push(filters.industry);
+      }
+
+      if (filters.status) {
+        whereClauses.push('status = ?');
+        params.push(filters.status);
+      }
+
+      if (filters.keyword) {
+        whereClauses.push('(company_name LIKE ? OR description LIKE ?)');
+        params.push(`%${filters.keyword}%`, `%${filters.keyword}%`);
+      }
+
+      const whereSQL = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
       const cases = all<CustomerCase>(
-        `SELECT * FROM customer_cases ORDER BY sort_order ASC, created_at DESC LIMIT ? OFFSET ?`,
-        [limit, offset]
+        `SELECT * FROM customer_cases ${whereSQL} ORDER BY sort_order ASC, created_at DESC LIMIT ? OFFSET ?`,
+        [...params, limit, offset]
       );
       return {
         success: true,
@@ -182,6 +202,32 @@ export class CustomerCaseService {
       return { success: true, data: industries };
     } catch (error) {
       console.error('获取行业列表失败:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  // 批量删除
+  static batchDelete(ids: number[]): DatabaseResult<boolean> {
+    try {
+      if (ids.length === 0) return { success: true, data: true };
+      const placeholders = ids.map(() => '?').join(',');
+      const delInfo = run(`DELETE FROM customer_cases WHERE id IN (${placeholders})`, ids);
+      return { success: true, data: delInfo.changes > 0 };
+    } catch (error) {
+      console.error('批量删除客户案例失败:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  // 批量更新状态
+  static batchUpdateStatus(ids: number[], status: string): DatabaseResult<boolean> {
+    try {
+      if (ids.length === 0) return { success: true, data: true };
+      const placeholders = ids.map(() => '?').join(',');
+      const info = run(`UPDATE customer_cases SET status = ? WHERE id IN (${placeholders})`, [status, ...ids]);
+      return { success: true, data: info.changes > 0 };
+    } catch (error) {
+      console.error('批量更新客户案例状态失败:', error);
       return { success: false, error: (error as Error).message };
     }
   }

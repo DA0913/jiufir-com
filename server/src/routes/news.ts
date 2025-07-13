@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { NewsService } from '../services/newsService.js';
+import { authMiddleware } from '../middleware/auth.js';
 import { CreateNewsArticleRequest } from '../types/index.js';
 
 const router = Router();
@@ -142,7 +143,7 @@ router.get('/category/:category', async (req: Request, res: Response) => {
 });
 
 // 创建新闻文章（管理员接口）
-router.post('/', validateNewsArticle, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, validateNewsArticle, async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -188,7 +189,7 @@ router.post('/', validateNewsArticle, async (req: Request, res: Response) => {
 });
 
 // 更新新闻文章（管理员接口）
-router.patch('/:id', validateNewsArticle, async (req: Request, res: Response) => {
+router.patch('/:id', authMiddleware, validateNewsArticle, async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -226,7 +227,7 @@ router.patch('/:id', validateNewsArticle, async (req: Request, res: Response) =>
 });
 
 // 删除新闻文章（管理员接口）
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const result = await NewsService.deleteNewsArticle(id);

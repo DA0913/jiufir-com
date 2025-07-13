@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
 import { FormService } from '../services/formService.js';
+import { authMiddleware } from '../middleware/auth.js';
 import { CreateFormSubmissionRequest, UpdateFormSubmissionRequest } from '../types/index.js';
 
 const router = Router();
@@ -60,7 +61,7 @@ router.post('/submit', validateFormSubmission, async (req: Request, res: Respons
 });
 
 // 获取所有表单提交（管理员接口）
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
@@ -120,7 +121,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // 更新表单提交状态（管理员接口）
-router.patch('/:id', [
+router.patch('/:id', authMiddleware, [
   body('status').optional().isIn(['pending', 'processing', 'completed', 'invalid']).withMessage('状态值无效'),
   body('notes').optional().isString().withMessage('备注必须是字符串')
 ], async (req: Request, res: Response) => {
@@ -161,7 +162,7 @@ router.patch('/:id', [
 });
 
 // 删除表单提交（管理员接口）
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const result = await FormService.deleteFormSubmission(id);
@@ -187,7 +188,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 });
 
 // 获取表单提交统计（管理员接口）
-router.get('/stats/summary', async (req: Request, res: Response) => {
+router.get('/stats/summary', authMiddleware, async (req: Request, res: Response) => {
   try {
     const result = await FormService.getFormSubmissionStats();
 

@@ -8,6 +8,7 @@ import { initDatabase } from './database/init.js';
 // 路由导入
 import formsRouter from './routes/forms.js';
 import newsRouter from './routes/news.js';
+import casesRouter from './routes/cases.js';
 import authRouter from './routes/auth';
 
 // 加载环境变量
@@ -54,6 +55,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/forms', formsRouter);
 app.use('/api/news', newsRouter);
+app.use('/api/cases', casesRouter);
 
 app.get('/api/dashboard', (req, res) => {
   res.json({
