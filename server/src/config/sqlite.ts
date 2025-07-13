@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import type { Database as BetterSqlite3Database } from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,7 +13,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // 创建并导出数据库实例（若文件不存在将自动创建）
-const db = new Database(DB_PATH, {
+const db: BetterSqlite3Database = new Database(DB_PATH, {
   verbose: process.env.NODE_ENV === 'development' ? console.log : undefined
 });
 
@@ -30,3 +31,17 @@ export const all = <T = any>(sql: string, params: any[] = []): T[] => {
 };
 
 export default db;
+
+// 清理：进程退出时关闭数据库连接
+const cleanup = () => {
+  try {
+    db.close();
+    console.log('🛑 SQLite 连接已关闭');
+  } catch (err) {
+    console.error('关闭 SQLite 连接出错:', err);
+  }
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
+process.on('exit', cleanup);
