@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { run, get, all } from '../config/sqlite';
 import { NewsArticle, CreateNewsArticleRequest, DatabaseResult } from '../types/index.js';
 
 export class NewsService {
@@ -7,16 +7,28 @@ export class NewsService {
     try {
       const { title, category, publish_time, image_url, summary, content, is_featured } = data;
       
-      const result = await query(
+      const result = run(
         `INSERT INTO news_articles (title, category, publish_time, image_url, summary, content, is_featured)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING *`,
-        [title, category, publish_time, image_url, summary, content, is_featured || false]
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [title, category, publish_time, image_url, summary, content, is_featured ? 1 : 0]
       );
+
+      // 获取插入的记录
+      const insertedRecord = get<NewsArticle>(
+        'SELECT * FROM news_articles WHERE id = ?',
+        [result.lastInsertRowid]
+      );
+
+      if (!insertedRecord) {
+        return {
+          success: false,
+          error: '创建新闻文章失败'
+        };
+      }
 
       return {
         success: true,
-        data: result.rows[0] as NewsArticle
+        data: insertedRecord
       };
     } catch (error) {
       console.error('创建新闻文章失败:', error);
@@ -32,16 +44,16 @@ export class NewsService {
     try {
       const offset = (page - 1) * limit;
       
-      const result = await query(
+      const results = all<NewsArticle>(
         `SELECT * FROM news_articles 
          ORDER BY publish_time DESC 
-         LIMIT $1 OFFSET $2`,
+         LIMIT ? OFFSET ?`,
         [limit, offset]
       );
 
       return {
         success: true,
-        data: result.rows as NewsArticle[]
+        data: results
       };
     } catch (error) {
       console.error('获取新闻文章失败:', error);
@@ -55,17 +67,17 @@ export class NewsService {
   // 获取精选新闻文章
   static async getFeaturedNewsArticles(limit: number = 5): Promise<DatabaseResult<NewsArticle[]>> {
     try {
-      const result = await query(
+      const results = all<NewsArticle>(
         `SELECT * FROM news_articles 
-         WHERE is_featured = true 
+         WHERE is_featured = 1 
          ORDER BY publish_time DESC 
-         LIMIT $1`,
+         LIMIT ?`,
         [limit]
       );
 
       return {
         success: true,
-        data: result.rows as NewsArticle[]
+        data: results
       };
     } catch (error) {
       console.error('获取精选新闻失败:', error);
@@ -79,12 +91,12 @@ export class NewsService {
   // 根据ID获取新闻文章
   static async getNewsArticleById(id: string): Promise<DatabaseResult<NewsArticle>> {
     try {
-      const result = await query(
-        'SELECT * FROM news_articles WHERE id = $1',
-        [id]
+      const result = get<NewsArticle>(
+        'SELECT * FROM news_articles WHERE id = ?',
+        [parseInt(id)]
       );
 
-      if (result.rows.length === 0) {
+      if (!result) {
         return {
           success: false,
           error: '新闻文章不存在'
@@ -93,7 +105,7 @@ export class NewsService {
 
       return {
         success: true,
-        data: result.rows[0] as NewsArticle
+        data: result
       };
     } catch (error) {
       console.error('获取新闻文章失败:', error);
@@ -109,17 +121,17 @@ export class NewsService {
     try {
       const offset = (page - 1) * limit;
       
-      const result = await query(
+      const results = all<NewsArticle>(
         `SELECT * FROM news_articles 
-         WHERE category = $1 
+         WHERE category = ? 
          ORDER BY publish_time DESC 
-         LIMIT $2 OFFSET $3`,
+         LIMIT ? OFFSET ?`,
         [category, limit, offset]
       );
 
       return {
         success: true,
-        data: result.rows as NewsArticle[]
+        data: results
       };
     } catch (error) {
       console.error('获取分类新闻失败:', error);
@@ -133,14 +145,14 @@ export class NewsService {
   // 增加文章浏览量
   static async incrementViews(id: string): Promise<DatabaseResult<boolean>> {
     try {
-      const result = await query(
-        'UPDATE news_articles SET views = views + 1 WHERE id = $1',
-        [id]
+      const result = run(
+        'UPDATE news_articles SET views = views + 1 WHERE id = ?',
+        [parseInt(id)]
       );
 
       return {
-        success: result.rowCount > 0,
-        data: result.rowCount > 0
+        success: result.changes > 0,
+        data: result.changes > 0
       };
     } catch (error) {
       console.error('增加浏览量失败:', error);
@@ -155,13 +167,17 @@ export class NewsService {
   static async updateNewsArticle(id: string, data: Partial<CreateNewsArticleRequest>): Promise<DatabaseResult<NewsArticle>> {
     try {
       const updateFields: string[] = [];
-      const values: any[] = [id];
-      let paramIndex = 2;
+      const values: any[] = [];
 
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined) {
-          updateFields.push(`${key} = $${paramIndex++}`);
-          values.push(value);
+          updateFields.push(`${key} = ?`);
+          // 处理布尔值转换
+          if (key === 'is_featured' && typeof value === 'boolean') {
+            values.push(value ? 1 : 0);
+          } else {
+            values.push(value);
+          }
         }
       });
 
@@ -172,24 +188,40 @@ export class NewsService {
         };
       }
 
-      const result = await query(
+      // 添加更新时间和ID
+      updateFields.push('updated_at = datetime(\'now\')');
+      values.push(parseInt(id));
+
+      const result = run(
         `UPDATE news_articles 
-         SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
+         SET ${updateFields.join(', ')}
+         WHERE id = ?`,
         values
       );
 
-      if (result.rows.length === 0) {
+      if (result.changes === 0) {
         return {
           success: false,
           error: '新闻文章不存在'
         };
       }
 
+      // 获取更新后的记录
+      const updatedRecord = get<NewsArticle>(
+        'SELECT * FROM news_articles WHERE id = ?',
+        [parseInt(id)]
+      );
+
+      if (!updatedRecord) {
+        return {
+          success: false,
+          error: '获取更新后的记录失败'
+        };
+      }
+
       return {
         success: true,
-        data: result.rows[0] as NewsArticle
+        data: updatedRecord
       };
     } catch (error) {
       console.error('更新新闻文章失败:', error);
@@ -203,14 +235,14 @@ export class NewsService {
   // 删除新闻文章
   static async deleteNewsArticle(id: string): Promise<DatabaseResult<boolean>> {
     try {
-      const result = await query(
-        'DELETE FROM news_articles WHERE id = $1',
-        [id]
+      const result = run(
+        'DELETE FROM news_articles WHERE id = ?',
+        [parseInt(id)]
       );
 
       return {
-        success: result.rowCount > 0,
-        data: result.rowCount > 0
+        success: result.changes > 0,
+        data: result.changes > 0
       };
     } catch (error) {
       console.error('删除新闻文章失败:', error);
@@ -224,11 +256,11 @@ export class NewsService {
   // 获取新闻分类列表
   static async getNewsCategories(): Promise<DatabaseResult<string[]>> {
     try {
-      const result = await query(
+      const results = all<{ category: string }>(
         'SELECT DISTINCT category FROM news_articles ORDER BY category'
       );
 
-      const categories = result.rows.map(row => row.category);
+      const categories = results.map(row => row.category);
       return {
         success: true,
         data: categories

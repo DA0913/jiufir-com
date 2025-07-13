@@ -1,49 +1,49 @@
-// 数据库模型类型定义
+// 数据库模型类型定义 (SQLite 版本)
 export interface FormSubmission {
-  id: string;
+  id: number;
   company_name: string;
   user_name: string;
   phone: string;
-  company_types: string[];
+  company_types: string[]; // 在 SQLite 中存储为 JSON 字符串
   source_url: string;
-  submitted_at: Date;
+  submitted_at: string; // SQLite 中时间存储为 TEXT
   status: 'pending' | 'processing' | 'completed' | 'invalid';
   notes?: string;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface NewsArticle {
-  id: string;
+  id: number;
   title: string;
   category: string;
-  publish_time: Date;
+  publish_time: string; // SQLite 中时间存储为 TEXT
   image_url?: string;
   summary?: string;
   content?: string;
   views: number;
-  is_featured: boolean;
-  created_at: Date;
-  updated_at: Date;
+  is_featured: number; // SQLite 中布尔值存储为 INTEGER (0/1)
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CustomerCase {
-  id: string;
+  id: number;
   company_name: string;
   company_logo: string;
   industry: string;
   description: string;
   results: string;
-  metrics: Record<string, any>;
-  is_featured: boolean;
+  metrics: Record<string, any>; // 在 SQLite 中存储为 JSON 字符串
+  is_featured: number; // SQLite 中布尔值存储为 INTEGER (0/1)
   sort_order: number;
   status: 'active' | 'inactive';
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CaseConfiguration {
-  id: string;
+  id: number;
   title: string;
   subtitle?: string;
   description?: string;
@@ -52,21 +52,21 @@ export interface CaseConfiguration {
   stock_code?: string;
   image_url?: string;
   link_url?: string;
-  is_active: boolean;
+  is_active: number; // SQLite 中布尔值存储为 INTEGER (0/1)
   sort_order: number;
-  created_at: Date;
-  updated_at: Date;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
   password_hash: string;
   role: 'admin' | 'user';
-  is_active: boolean;
-  created_at: Date;
-  updated_at: Date;
+  is_active: number; // SQLite 中布尔值存储为 INTEGER (0/1)
+  created_at: string;
+  updated_at: string;
 }
 
 // API请求/响应类型

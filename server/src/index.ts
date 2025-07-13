@@ -3,7 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { testConnection } from './config/database.js';
+import { testSQLiteConnection, closeDatabase } from './config/sqlite';
+import runSQLiteMigration from './database/sqlite_migrate';
 
 // 路由导入
 import formsRouter from './routes/forms.js';
@@ -96,12 +97,15 @@ app.use((error: any, req: express.Request, res: express.Response, next: express.
 // 启动服务器
 const startServer = async () => {
   try {
+    // 运行 SQLite 数据库迁移
+    console.log('🔌 初始化 SQLite 数据库...');
+    await runSQLiteMigration();
+    
     // 测试数据库连接
-    console.log('🔌 测试数据库连接...');
-    const isConnected = await testConnection();
+    const isConnected = testSQLiteConnection();
     
     if (!isConnected) {
-      console.error('❌ 数据库连接失败，请检查配置');
+      console.error('❌ SQLite 数据库连接失败，请检查配置');
       process.exit(1);
     }
 
@@ -122,11 +126,13 @@ const startServer = async () => {
 // 优雅关闭
 process.on('SIGTERM', () => {
   console.log('🛑 收到SIGTERM信号，正在关闭服务器...');
+  closeDatabase();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('🛑 收到SIGINT信号，正在关闭服务器...');
+  closeDatabase();
   process.exit(0);
 });
 

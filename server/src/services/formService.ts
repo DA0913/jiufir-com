@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { run, get, all } from '../config/sqlite';
 import { FormSubmission, CreateFormSubmissionRequest, UpdateFormSubmissionRequest, DatabaseResult } from '../types/index.js';
 
 export class FormService {
@@ -7,16 +7,34 @@ export class FormService {
     try {
       const { company_name, user_name, phone, company_types, source_url } = data;
       
-      const result = await query(
+      const result = run(
         `INSERT INTO form_submissions (company_name, user_name, phone, company_types, source_url)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
+         VALUES (?, ?, ?, ?, ?)`,
         [company_name, user_name, phone, JSON.stringify(company_types), source_url]
       );
 
+      // 获取插入的记录
+      const insertedRecord = get<FormSubmission>(
+        'SELECT * FROM form_submissions WHERE id = ?',
+        [result.lastInsertRowid]
+      );
+
+      if (!insertedRecord) {
+        return {
+          success: false,
+          error: '创建表单提交失败'
+        };
+      }
+
+      // 解析 JSON 字段
+      const formattedRecord = {
+        ...insertedRecord,
+        company_types: JSON.parse(insertedRecord.company_types as any)
+      };
+
       return {
         success: true,
-        data: result.rows[0] as FormSubmission
+        data: formattedRecord
       };
     } catch (error) {
       console.error('创建表单提交失败:', error);
@@ -32,16 +50,22 @@ export class FormService {
     try {
       const offset = (page - 1) * limit;
       
-      const result = await query(
+      const results = all<FormSubmission>(
         `SELECT * FROM form_submissions 
          ORDER BY created_at DESC 
-         LIMIT $1 OFFSET $2`,
+         LIMIT ? OFFSET ?`,
         [limit, offset]
       );
 
+      // 解析 JSON 字段
+      const formattedResults = results.map(record => ({
+        ...record,
+        company_types: JSON.parse(record.company_types as any)
+      }));
+
       return {
         success: true,
-        data: result.rows as FormSubmission[]
+        data: formattedResults
       };
     } catch (error) {
       console.error('获取表单提交失败:', error);
@@ -55,21 +79,27 @@ export class FormService {
   // 根据ID获取表单提交
   static async getFormSubmissionById(id: string): Promise<DatabaseResult<FormSubmission>> {
     try {
-      const result = await query(
-        'SELECT * FROM form_submissions WHERE id = $1',
-        [id]
+      const result = get<FormSubmission>(
+        'SELECT * FROM form_submissions WHERE id = ?',
+        [parseInt(id)]
       );
 
-      if (result.rows.length === 0) {
+      if (!result) {
         return {
           success: false,
           error: '表单提交不存在'
         };
       }
 
+      // 解析 JSON 字段
+      const formattedResult = {
+        ...result,
+        company_types: JSON.parse(result.company_types as any)
+      };
+
       return {
         success: true,
-        data: result.rows[0] as FormSubmission
+        data: formattedResult
       };
     } catch (error) {
       console.error('获取表单提交失败:', error);
@@ -85,16 +115,15 @@ export class FormService {
     try {
       const { status, notes } = data;
       const updateFields: string[] = [];
-      const values: any[] = [id];
-      let paramIndex = 2;
+      const values: any[] = [];
 
       if (status !== undefined) {
-        updateFields.push(`status = $${paramIndex++}`);
+        updateFields.push('status = ?');
         values.push(status);
       }
 
       if (notes !== undefined) {
-        updateFields.push(`notes = $${paramIndex++}`);
+        updateFields.push('notes = ?');
         values.push(notes);
       }
 
@@ -105,24 +134,46 @@ export class FormService {
         };
       }
 
-      const result = await query(
+      // 添加更新时间和ID
+      updateFields.push('updated_at = datetime(\'now\')');
+      values.push(parseInt(id));
+
+      const result = run(
         `UPDATE form_submissions 
-         SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
+         SET ${updateFields.join(', ')}
+         WHERE id = ?`,
         values
       );
 
-      if (result.rows.length === 0) {
+      if (result.changes === 0) {
         return {
           success: false,
           error: '表单提交不存在'
         };
       }
 
+      // 获取更新后的记录
+      const updatedRecord = get<FormSubmission>(
+        'SELECT * FROM form_submissions WHERE id = ?',
+        [parseInt(id)]
+      );
+
+      if (!updatedRecord) {
+        return {
+          success: false,
+          error: '获取更新后的记录失败'
+        };
+      }
+
+      // 解析 JSON 字段
+      const formattedRecord = {
+        ...updatedRecord,
+        company_types: JSON.parse(updatedRecord.company_types as any)
+      };
+
       return {
         success: true,
-        data: result.rows[0] as FormSubmission
+        data: formattedRecord
       };
     } catch (error) {
       console.error('更新表单提交失败:', error);
@@ -136,12 +187,12 @@ export class FormService {
   // 删除表单提交
   static async deleteFormSubmission(id: string): Promise<DatabaseResult<boolean>> {
     try {
-      const result = await query(
-        'DELETE FROM form_submissions WHERE id = $1',
-        [id]
+      const result = run(
+        'DELETE FROM form_submissions WHERE id = ?',
+        [parseInt(id)]
       );
 
-      if (result.rowCount === 0) {
+      if (result.changes === 0) {
         return {
           success: false,
           error: '表单提交不存在'
@@ -164,7 +215,7 @@ export class FormService {
   // 获取表单提交统计
   static async getFormSubmissionStats(): Promise<DatabaseResult<any>> {
     try {
-      const result = await query(`
+      const result = get(`
         SELECT 
           COUNT(*) as total,
           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
@@ -176,7 +227,7 @@ export class FormService {
 
       return {
         success: true,
-        data: result.rows[0]
+        data: result
       };
     } catch (error) {
       console.error('获取表单统计失败:', error);
