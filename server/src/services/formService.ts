@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { run, get, all } from '../config/sqlite.js';
 import { FormSubmission, CreateFormSubmissionRequest, UpdateFormSubmissionRequest, DatabaseResult } from '../types/index.js';
 
 export class FormService {
@@ -6,18 +6,21 @@ export class FormService {
   static async createFormSubmission(data: CreateFormSubmissionRequest): Promise<DatabaseResult<FormSubmission>> {
     try {
       const { company_name, user_name, phone, company_types, source_url } = data;
-      
-      const result = await query(
+
+      // 插入数据
+      const insertResult = run(
         `INSERT INTO form_submissions (company_name, user_name, phone, company_types, source_url)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING *`,
+         VALUES (?, ?, ?, ?, ?)`,
         [company_name, user_name, phone, JSON.stringify(company_types), source_url]
       );
 
-      return {
+      // 获取插入的记录
+      const inserted = get<FormSubmission>('SELECT * FROM form_submissions WHERE id = ?', [insertResult.lastInsertRowid]);
+
+      return Promise.resolve({
         success: true,
-        data: result.rows[0] as FormSubmission
-      };
+        data: inserted as FormSubmission
+      });
     } catch (error) {
       console.error('创建表单提交失败:', error);
       return {
@@ -31,18 +34,15 @@ export class FormService {
   static async getAllFormSubmissions(page: number = 1, limit: number = 10): Promise<DatabaseResult<FormSubmission[]>> {
     try {
       const offset = (page - 1) * limit;
-      
-      const result = await query(
-        `SELECT * FROM form_submissions 
-         ORDER BY created_at DESC 
-         LIMIT $1 OFFSET $2`,
+      const rows = all<FormSubmission>(
+        `SELECT * FROM form_submissions ORDER BY created_at DESC LIMIT ? OFFSET ?`,
         [limit, offset]
       );
 
-      return {
+      return Promise.resolve({
         success: true,
-        data: result.rows as FormSubmission[]
-      };
+        data: rows
+      });
     } catch (error) {
       console.error('获取表单提交失败:', error);
       return {
@@ -55,22 +55,19 @@ export class FormService {
   // 根据ID获取表单提交
   static async getFormSubmissionById(id: string): Promise<DatabaseResult<FormSubmission>> {
     try {
-      const result = await query(
-        'SELECT * FROM form_submissions WHERE id = $1',
-        [id]
-      );
+      const row = get<FormSubmission>('SELECT * FROM form_submissions WHERE id = ?', [id]);
 
-      if (result.rows.length === 0) {
+      if (!row) {
         return {
           success: false,
           error: '表单提交不存在'
         };
       }
 
-      return {
+      return Promise.resolve({
         success: true,
-        data: result.rows[0] as FormSubmission
-      };
+        data: row
+      });
     } catch (error) {
       console.error('获取表单提交失败:', error);
       return {
@@ -85,16 +82,15 @@ export class FormService {
     try {
       const { status, notes } = data;
       const updateFields: string[] = [];
-      const values: any[] = [id];
-      let paramIndex = 2;
+      const values: any[] = [];
 
       if (status !== undefined) {
-        updateFields.push(`status = $${paramIndex++}`);
+        updateFields.push(`status = ?`);
         values.push(status);
       }
 
       if (notes !== undefined) {
-        updateFields.push(`notes = $${paramIndex++}`);
+        updateFields.push(`notes = ?`);
         values.push(notes);
       }
 
@@ -105,25 +101,22 @@ export class FormService {
         };
       }
 
-      const result = await query(
-        `UPDATE form_submissions 
-         SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $1
-         RETURNING *`,
-        values
-      );
+      const sql = `UPDATE form_submissions SET ${updateFields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+      run(sql, [...values, id]);
 
-      if (result.rows.length === 0) {
+      const updated = get<FormSubmission>('SELECT * FROM form_submissions WHERE id = ?', [id]);
+
+      if (!updated) {
         return {
           success: false,
           error: '表单提交不存在'
         };
       }
 
-      return {
+      return Promise.resolve({
         success: true,
-        data: result.rows[0] as FormSubmission
-      };
+        data: updated
+      });
     } catch (error) {
       console.error('更新表单提交失败:', error);
       return {
@@ -136,22 +129,19 @@ export class FormService {
   // 删除表单提交
   static async deleteFormSubmission(id: string): Promise<DatabaseResult<boolean>> {
     try {
-      const result = await query(
-        'DELETE FROM form_submissions WHERE id = $1',
-        [id]
-      );
+      const result = run('DELETE FROM form_submissions WHERE id = ?', [id]);
 
-      if (result.rowCount === 0) {
+      if (result.changes === 0) {
         return {
           success: false,
           error: '表单提交不存在'
         };
       }
 
-      return {
+      return Promise.resolve({
         success: true,
         data: true
-      };
+      });
     } catch (error) {
       console.error('删除表单提交失败:', error);
       return {
@@ -164,20 +154,20 @@ export class FormService {
   // 获取表单提交统计
   static async getFormSubmissionStats(): Promise<DatabaseResult<any>> {
     try {
-      const result = await query(`
-        SELECT 
+      const stats = get<any>(
+        `SELECT 
           COUNT(*) as total,
-          COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
-          COUNT(CASE WHEN status = 'processing' THEN 1 END) as processing,
-          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-          COUNT(CASE WHEN status = 'invalid' THEN 1 END) as invalid
-        FROM form_submissions
-      `);
+          SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN status = 'invalid' THEN 1 ELSE 0 END) as invalid
+        FROM form_submissions`
+      );
 
-      return {
+      return Promise.resolve({
         success: true,
-        data: result.rows[0]
-      };
+        data: stats
+      });
     } catch (error) {
       console.error('获取表单统计失败:', error);
       return {
